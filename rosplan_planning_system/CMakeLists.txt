@@ -106,6 +106,7 @@ add_executable(planner ${PLANNING_SOURCES} ${VAL_SOURCES})
 add_executable(plannerInterface ${PLANNING_INTERFACE_SOURCES} ${VAL_SOURCES})
 add_executable(simulatedAction src/RPSimulatedActionInterface.cpp src/RPActionInterface.cpp)
 add_executable(print_plan src/print_plan.cpp)
+add_executable(test_plan_parser ${VAL_SOURCES} src/PlanParsing/POPFEsterelPlanParser.cpp src/PlanningEnvironment.cpp src/test_plan_parser.cpp)
 
 ## Add dependencies
 add_dependencies(planner ${catkin_EXPORTED_TARGETS})
@@ -118,6 +119,7 @@ target_link_libraries(planner ${catkin_LIBRARIES})
 target_link_libraries(plannerInterface ${catkin_LIBRARIES})
 target_link_libraries(simulatedAction ${catkin_LIBRARIES})
 target_link_libraries(print_plan ${catkin_LIBRARIES})
+target_link_libraries(test_plan_parser ${catkin_LIBRARIES})
 
 ## Declare libraries
 add_library(${PROJECT_NAME} ${PLANNING_SOURCES} ${VAL_SOURCES})
@@ -129,7 +131,7 @@ add_dependencies(rosplan_action_interface ${catkin_EXPORTED_TARGETS})
 ## Install ##
 #############
 
-install(TARGETS ${PROJECT_NAME} rosplan_action_interface planner print_plan simulatedAction
+install(TARGETS ${PROJECT_NAME} rosplan_action_interface planner print_plan simulatedAction test_plan_parser
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

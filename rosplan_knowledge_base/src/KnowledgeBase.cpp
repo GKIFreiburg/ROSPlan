@@ -155,13 +155,15 @@ namespace KCL_rosplan {
 			std::vector<rosplan_knowledge_msgs::KnowledgeItem>::iterator pit;
 			for(pit=model_functions.begin(); pit!=model_functions.end(); pit++) {
 				if(KnowledgeComparitor::containsKnowledge(msg, *pit)) {
-					ROS_INFO("KCL: (KB) Removing domain attribute (%s)", msg.attribute_name.c_str());
+					ROS_INFO_STREAM("KCL: (KB) Removing domain attribute "<<toString(msg));
 					plan_filter.checkFilters(msg, false);
 					pit = model_functions.erase(pit);
+					return ;
 					if(pit!=model_functions.begin()) pit--;
 					if(pit==model_functions.end()) break;
 				}
 			}
+			ROS_WARN_STREAM("KCL: (KB) Not removing, no match found: "<<toString(msg));
 
 		} else if(msg.knowledge_type == rosplan_knowledge_msgs::KnowledgeItem::FACT) {
 
@@ -169,13 +171,15 @@ namespace KCL_rosplan {
 			std::vector<rosplan_knowledge_msgs::KnowledgeItem>::iterator pit;
 			for(pit=model_facts.begin(); pit!=model_facts.end(); pit++) {
 				if(KnowledgeComparitor::containsKnowledge(msg, *pit)) {
-					ROS_INFO("KCL: (KB) Removing domain attribute (%s)", msg.attribute_name.c_str());
+					ROS_INFO_STREAM("KCL: (KB) Removing domain attribute "<<toString(msg));
 					plan_filter.checkFilters(msg, false);
 					pit = model_facts.erase(pit);
+					return ;
 					if(pit!=model_facts.begin()) pit--;
 					if(pit==model_facts.end()) break;
 				}
 			}
+			ROS_WARN_STREAM("KCL: (KB) Not removing, no match found: "<<toString(msg));
 		}
 	}
 
@@ -202,7 +206,7 @@ namespace KCL_rosplan {
 		std::vector<rosplan_knowledge_msgs::KnowledgeItem>::iterator git;
 		for(git=model_goals.begin(); git!=model_goals.end(); git++) {
 			if(KnowledgeComparitor::containsKnowledge(msg, *git)) {
-				ROS_INFO("KCL: (KB) Removing goal (%s)", msg.attribute_name.c_str());
+				ROS_INFO_STREAM("KCL: (KB) Removing goal: "<<toString(msg));
 				git = model_goals.erase(git);
 				if(git!=model_goals.begin()) git--;
 				if(git==model_goals.end()) break;
@@ -234,7 +238,7 @@ namespace KCL_rosplan {
 
 			// add instance
 			if(iit==model_instances[msg.instance_type].end()) {
-				ROS_INFO("KCL: (KB) Adding instance (%s, %s)", msg.instance_type.c_str(), msg.instance_name.c_str());
+				ROS_INFO_STREAM("KCL: (KB) Adding instance "<<toString(msg));
 				model_instances[msg.instance_type].push_back(msg.instance_name);
 				plan_filter.checkFilters(msg, true);
 			}
@@ -242,21 +246,14 @@ namespace KCL_rosplan {
 		} else if(msg.knowledge_type == rosplan_knowledge_msgs::KnowledgeItem::FACT) {
 			// add domain attribute
 
-			std::string param_str;
-			for (size_t i = 0; i < msg.values.size(); ++i) {
-				param_str += " " + msg.values[i].key + "=" + msg.values[i].value;
-			}
-
 			std::vector<rosplan_knowledge_msgs::KnowledgeItem>::iterator pit;
 			for(pit=model_facts.begin(); pit!=model_facts.end(); pit++) {
 				if(KnowledgeComparitor::containsKnowledge(msg, *pit)) {
-          ROS_WARN("KCL: (KB) Domain attribute (%s%s) already exists",
-                   msg.attribute_name.c_str(), param_str.c_str());
+					ROS_WARN_STREAM("KCL: (KB) Domain attribute already exists"<<toString(msg));
 					return;
 				}
 			}
-			ROS_INFO("KCL: (KB) Adding domain attribute (%s%s)",
-			         msg.attribute_name.c_str(), param_str.c_str());
+			ROS_INFO_STREAM("KCL: (KB) Adding domain attribute "<<toString(msg));
 			model_facts.push_back(msg);
 			plan_filter.checkFilters(msg, true);
 
@@ -267,12 +264,12 @@ namespace KCL_rosplan {
 			for(pit=model_functions.begin(); pit!=model_functions.end(); pit++) {
 				if(KnowledgeComparitor::containsKnowledge(msg, *pit)) {
 					// already added TODO value check
-					ROS_INFO("KCL: (KB) Updating domain function (%s)", msg.attribute_name.c_str());
+					ROS_INFO_STREAM("KCL: (KB) Updating domain function "<<toString(msg));
 					pit->function_value = msg.function_value;
 					return;
 				}
 			}
-			ROS_INFO("KCL: (KB) Adding domain function (%s)", msg.attribute_name.c_str());
+			ROS_INFO_STREAM("KCL: (KB) Adding domain function "<<toString(msg));
 			model_functions.push_back(msg);
 			plan_filter.checkFilters(msg, true);
 		}
@@ -291,14 +288,12 @@ namespace KCL_rosplan {
 		std::vector<rosplan_knowledge_msgs::KnowledgeItem>::iterator pit;
 		for(pit=model_goals.begin(); pit!=model_goals.end(); pit++) {
 			if(KnowledgeComparitor::containsKnowledge(msg, *pit)) {
-				ROS_WARN("KCL: (KB) Goal (%s%s) already posted",
-				         msg.attribute_name.c_str(), param_str.c_str());
+				ROS_WARN_STREAM("KCL: (KB) Goal already posted"<<toString(msg));
 				return;
 			}
 		}
 		
-		ROS_INFO("KCL: (KB) Adding mission goal (%s%s)",
-		         msg.attribute_name.c_str(), param_str.c_str());
+		ROS_INFO_STREAM("KCL: (KB) Adding mission goal "<<toString(msg));
 		model_goals.push_back(msg);
 	}
 
@@ -473,6 +468,24 @@ namespace KCL_rosplan {
 			}
 		}
 		return false;
+	}
+
+	std::string KnowledgeBase::toString(const rosplan_knowledge_msgs::KnowledgeItem& item)
+	{
+		if (item.knowledge_type == item.INSTANCE)
+		{
+			return std::string(item.instance_name+" - "+item.instance_type);
+		}
+		std::string param_str;
+		for (size_t i = 0; i < item.values.size(); ++i) {
+			param_str += " " + item.values[i].key + "=" + item.values[i].value;
+		}
+		std::string fact("("+item.attribute_name+param_str+")");
+		if (item.knowledge_type == item.FUNCTION)
+		{
+			return std::string("(= "+fact+" "+std::to_string(item.function_value)+")");
+		}
+		return fact;
 	}
 
 } // close namespace

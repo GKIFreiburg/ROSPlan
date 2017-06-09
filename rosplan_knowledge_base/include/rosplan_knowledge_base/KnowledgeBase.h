@@ -93,6 +93,8 @@ namespace KCL_rosplan {
 		// conditional planning services
 		bool updateKnowledgeConstraintsOneOf(rosplan_knowledge_msgs::KnowledgeUpdateServiceArray::Request  &req, rosplan_knowledge_msgs::KnowledgeUpdateServiceArray::Response &res);
 		// TODO bool updateKnowledgeConstraintsUnknowns(rosplan_knowledge_msgs::KnowledgeUpdateServiceArray::Request  &req, rosplan_knowledge_msgs::KnowledgeUpdateServiceArray::Response &res);
+
+		std::string toString(const rosplan_knowledge_msgs::KnowledgeItem& item);
 	};
 }
 #endif
