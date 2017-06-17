@@ -32,7 +32,7 @@ namespace KCL_rosplan {
 
 				// find matching object in parameters of b
 				for(size_t i=0;i<b.values.size();i++) {
-					if(! boost::iequals(a.values[i].key, b.values[i].key) ||
+					if(/*! boost::iequals(a.values[i].key, b.values[i].key) ||*/
 					   ! boost::iequals(a.values[i].value, b.values[i].value))
 					{
 						return false;

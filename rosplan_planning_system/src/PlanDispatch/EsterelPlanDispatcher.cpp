@@ -390,7 +390,8 @@ namespace KCL_rosplan {
 
 		// action completed (failed)
 		if(!action_completed[normalised_action_id] && 0 == msg->status.compare("action failed")) {
-			replan_requested = true;
+//			replan_requested = true;
+			plan_cancelled = true;
 			action_completed[normalised_action_id] = true;
 		}
 	}
