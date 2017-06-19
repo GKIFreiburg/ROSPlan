@@ -237,9 +237,11 @@ void POPFEsterelPlanParser::earlifyActions(std::set<StrlNode*>& actions)
 	for (StrlNode* a: actions)
 	{
 		// for each parameter find earlier action with one same parameter
+//		ROS_INFO_STREAM("a: "<<a->dispatch_msg.name);
 		for (const auto& p: a->dispatch_msg.parameters)
 		{
-			p.value;
+			StrlNode* latest_depending = NULL;
+			double latest_end_time = 0;
 			for (const auto& other_a: actions)
 			{
 				if (a->dispatch_msg.action_id == other_a->dispatch_msg.action_id)
@@ -253,26 +255,30 @@ void POPFEsterelPlanParser::earlifyActions(std::set<StrlNode*>& actions)
 						});
 				if (found_it != other_a->dispatch_msg.parameters.end())
 				{
-					if (other_a->dispatch_msg.dispatch_time + other_a->dispatch_msg.duration < a->dispatch_msg.dispatch_time + epsilon)
+					double other_end_time = other_a->dispatch_msg.dispatch_time + other_a->dispatch_msg.duration;
+					if (other_end_time < a->dispatch_msg.dispatch_time + epsilon)
 					{
+//						ROS_INFO_STREAM("\to: "<<other_a->dispatch_msg.name<<" via "<<p.value);
 						dependency_graph[a].insert(other_a);
 					}
 				}
 			}
 		}
 	}
-	for (const auto& action_dependent: dependency_graph)
+	for (auto& action_dependent: dependency_graph)
 	{
-		ROS_INFO_STREAM("action: "<<action_dependent.first->dispatch_msg.name<<" depends on:");
-		for (const auto& prereq: action_dependent.second)
+//		ROS_INFO_STREAM("action: "<<action_dependent.first->dispatch_msg.name<<" depends on:");
+		for (auto& prereq: action_dependent.second)
 		{
-			ROS_INFO_STREAM(" "<<prereq->dispatch_msg.name);
+//			ROS_INFO_STREAM(" "<<prereq->dispatch_msg.name);
 			auto& edge = prereq->output.front();
 			action_dependent.first->input.push_back(edge);
 			edge->sinks.push_back(action_dependent.first);
 		}
 	}
 }
+
+
 
 /**
  * Parse a plan written by POPF
