@@ -1,4 +1,6 @@
 #include "rosplan_planning_system/POPFEsterelPlanParser.h"
+#include <rosplan_dispatch_msgs/ActionDispatch.h>
+#include <algorithm>
 
 /* implementation of rosplan_planning_system::POPFEsterelPlanParser.h */
 namespace KCL_rosplan
@@ -227,6 +229,51 @@ void POPFEsterelPlanParser::createNodeAndEdge(const std::string& action_name, do
 	action_list.push_back(node.dispatch_msg);
 }
 
+
+void POPFEsterelPlanParser::earlifyActions(std::set<StrlNode*>& actions)
+{
+	double epsilon = 0.01;
+	std::map<StrlNode*, std::set<StrlNode*> > dependency_graph;
+	for (StrlNode* a: actions)
+	{
+		// for each parameter find earlier action with one same parameter
+		for (const auto& p: a->dispatch_msg.parameters)
+		{
+			p.value;
+			for (const auto& other_a: actions)
+			{
+				if (a->dispatch_msg.action_id == other_a->dispatch_msg.action_id)
+				{
+					continue;
+				}
+				auto found_it = std::find_if(other_a->dispatch_msg.parameters.begin(), other_a->dispatch_msg.parameters.end(),
+						[p](const auto& other_p)
+						{
+							return p.value == other_p.value;
+						});
+				if (found_it != other_a->dispatch_msg.parameters.end())
+				{
+					if (other_a->dispatch_msg.dispatch_time + other_a->dispatch_msg.duration < a->dispatch_msg.dispatch_time + epsilon)
+					{
+						dependency_graph[a].insert(other_a);
+					}
+				}
+			}
+		}
+	}
+	for (const auto& action_dependent: dependency_graph)
+	{
+		ROS_INFO_STREAM("action: "<<action_dependent.first->dispatch_msg.name<<" depends on:");
+		for (const auto& prereq: action_dependent.second)
+		{
+			ROS_INFO_STREAM(" "<<prereq->dispatch_msg.name);
+			auto& edge = prereq->output.front();
+			action_dependent.first->input.push_back(edge);
+			edge->sinks.push_back(action_dependent.first);
+		}
+	}
+}
+
 /**
  * Parse a plan written by POPF
  */
@@ -289,18 +336,18 @@ void POPFEsterelPlanParser::preparePlan(std::string &dataPath, PlanningEnvironme
 			createNodeAndEdge(name, dispatchTime, duration, nodeCount, environment, *node, *edge);
 			++nodeCount;
 
-			double epsilon = 0.01;
-			for (const auto& a: previous_actions)
-			{
-				double a_finish_time = a->dispatch_msg.dispatch_time + a->dispatch_msg.duration;
-				if (fabs(dispatchTime - a_finish_time) < epsilon)
-				{
-					auto& a_edge = a->output.front();
-					node->input.push_back(a_edge);
-					a_edge->sinks.push_back(node);
-				}
-			}
-
+			// parallelization
+//			double epsilon = 0.01;
+//			for (const auto& a: previous_actions)
+//			{
+//				double a_finish_time = a->dispatch_msg.dispatch_time + a->dispatch_msg.duration;
+//				if (fabs(dispatchTime - a_finish_time) < epsilon)
+//				{
+//					auto& a_edge = a->output.front();
+//					node->input.push_back(a_edge);
+//					a_edge->sinks.push_back(node);
+//				}
+//			}
 			previous_actions.insert(node);
 //			if (last_edge != NULL)
 //			{
@@ -312,7 +359,8 @@ void POPFEsterelPlanParser::preparePlan(std::string &dataPath, PlanningEnvironme
 		ROS_DEBUG_STREAM("[PlanParser]  " << dispatchTime << ": " << name << " [" << duration << "]");
 	}
 
-	//printPlan(plan);
+	earlifyActions(previous_actions);
+
 	produceEsterel();
 }
 

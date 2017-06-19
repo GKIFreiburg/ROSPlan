@@ -63,6 +63,8 @@ namespace KCL_rosplan {
 		void reset();
 		void preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID);
 		void generateFilter(PlanningEnvironment &environment);
+
+		void earlifyActions(std::set<StrlNode*>& actions);
 	};
 } // close namespace
 
