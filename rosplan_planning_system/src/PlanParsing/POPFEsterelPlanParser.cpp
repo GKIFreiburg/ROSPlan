@@ -395,18 +395,17 @@ bool POPFEsterelPlanParser::produceEsterel()
 
 	// inputs
 	dest << "input SOURCE";
-	std::vector<StrlNode*>::iterator nit = plan_nodes.begin();
-	for (; nit != plan_nodes.end(); nit++)
+	for (const auto& node: plan_nodes)
 	{
-		dest << ", a" << (*nit)->node_id << "_complete";
+		dest << ", a" << node->node_id << "_complete";
 	}
 	dest << std::endl;
 
 	// outputs
 	dest << "output SINK";
-	for (nit = plan_nodes.begin(); nit != plan_nodes.end(); nit++)
+	for (const auto& node: plan_nodes)
 	{
-		dest << ", a" << (*nit)->node_id << "_dispatch";
+		dest << ", a" << node->node_id << "_dispatch";
 	}
 	dest << std::endl;
 
@@ -423,11 +422,11 @@ bool POPFEsterelPlanParser::produceEsterel()
 	}
 
 	// run everything
-	nit = plan_nodes.begin();
+	auto nit = plan_nodes.begin();
 	if (nit != plan_nodes.end())
 	{
 		dest << "run action" << (*nit)->node_id << "_" << (*nit)->dispatch_msg.name << std::endl;
-		for (; nit != plan_nodes.end(); nit++)
+		for (nit++; nit != plan_nodes.end(); nit++)
 		{
 			dest << " || action" << (*nit)->node_id << "_" << (*nit)->dispatch_msg.name << std::endl;
 		}
@@ -436,54 +435,55 @@ bool POPFEsterelPlanParser::produceEsterel()
 	dest << "end module" << std::endl << std::endl;
 
 	// action modules
-	nit = plan_nodes.begin();
-	for (; nit != plan_nodes.end(); nit++)
+	//for (nit = plan_nodes.begin(); nit != plan_nodes.end(); nit++)
+	for (const auto& node: plan_nodes)
 	{
-
-		dest << "module action" << (*nit)->node_id << "_" << (*nit)->dispatch_msg.name << ":" << std::endl;
-
-		if ((*nit)->input.size() > 0)
+		dest << "module action" << node->node_id << "_" << node->dispatch_msg.name << ":" << std::endl;
+		if (node->input.size() > 0)
 		{
 			dest << "input ";
-			for (int j = 0; j < (*nit)->input.size(); j++)
+			for (int j = 0; j < node->input.size(); j++)
 			{
 				if (j > 0)
 					dest << ", ";
-				dest << (*nit)->input[j]->edge_name;
+				dest << node->input[j]->edge_name;
 			}
 			dest << ";" << std::endl;
 		}
 
-		if ((*nit)->output.size() > 0)
+		if (node->output.size() > 0)
 		{
 			dest << "output ";
-			for (int j = 0; j < (*nit)->output.size(); j++)
+			for (int j = 0; j < node->output.size(); j++)
 			{
 				if (j > 0)
 					dest << ", ";
-				dest << (*nit)->output[j]->edge_name;
+				dest << node->output[j]->edge_name;
 			}
 			dest << ";" << std::endl;
 		}
 
-		if ((*nit)->input.size() > 0)
+		if (node->input.size() == 1)
 		{
-			dest << "  await ";
-			for (int j = 0; j < (*nit)->input.size(); j++)
+			dest << "  await "<<node->input.front()->edge_name<<";"<< std::endl;
+		}
+		else if (node->input.size() > 1)
+		{
+			auto edge_it = node->input.begin();
+			dest << "  [ await "<<(*edge_it)->edge_name;
+			for (edge_it++; edge_it != node->input.end(); edge_it++)
 			{
-				if (j > 0)
-					dest << " or ";
-				dest << (*nit)->input[j]->edge_name;
+				dest<<" || await "<<(*edge_it)->edge_name;
 			}
-			dest << ";" << std::endl;
+			dest << " ];" << std::endl;
 		}
 
-		dest << "  emit a" << (*nit)->node_id << "_dispatch;" << std::endl;
-		dest << "  await a" << (*nit)->node_id << "_complete;" << std::endl;
+		dest << "  emit a" << node->node_id << "_dispatch;" << std::endl;
+		dest << "  await a" << node->node_id << "_complete;" << std::endl;
 
-		for (int j = 0; j < (*nit)->output.size(); j++)
+		for (int j = 0; j < node->output.size(); j++)
 		{
-			dest << "emit " << (*nit)->output[j]->edge_name;
+			dest << "emit " << node->output[j]->edge_name;
 		}
 		dest << ";" << std::endl;
 		dest << "end module" << std::endl << std::endl;
