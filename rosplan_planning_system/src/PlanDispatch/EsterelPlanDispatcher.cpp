@@ -262,10 +262,12 @@ namespace KCL_rosplan {
 						if ((*ci)->signal_type == ACTION) {
 							action_edge_count++;
 							if ((*ci)->active) {
-								activate_action = true;
+								//activate_action = true;
+								strl_node->activateInput(*ci);
 							}
 						}
 					}
+					activate_action = strl_node->allInputsActive();
 
 					// query KMS for condition edges
 					bool activate = true;
@@ -327,7 +329,7 @@ namespace KCL_rosplan {
 						
 						// reset node
 						if (!strl_node->input.empty()) {
-							strl_node->dispatched = false;
+							strl_node->reset();
 						}
 					}
 

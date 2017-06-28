@@ -1,6 +1,7 @@
 #include "rosplan_planning_system/POPFEsterelPlanParser.h"
 #include <rosplan_dispatch_msgs/ActionDispatch.h>
 #include <algorithm>
+#include <regex>
 
 /* implementation of rosplan_planning_system::POPFEsterelPlanParser.h */
 namespace KCL_rosplan
@@ -15,10 +16,24 @@ POPFEsterelPlanParser::POPFEsterelPlanParser(ros::NodeHandle &nh) :
 			"/kcl_rosplan/update_knowledge_base");
 }
 
+POPFEsterelPlanParser::~POPFEsterelPlanParser()
+{
+	reset();
+}
+
 void POPFEsterelPlanParser::reset()
 {
+	for (auto node: plan_nodes)
+	{
+		delete node;
+	}
 	plan_nodes.clear();
+	for (auto edge: plan_edges)
+	{
+		delete edge;
+	}
 	plan_edges.clear();
+	action_list.clear();
 }
 
 void POPFEsterelPlanParser::generateFilter(PlanningEnvironment &environment)
@@ -169,80 +184,124 @@ void POPFEsterelPlanParser::preparePDDLConditions(StrlNode &node, PlanningEnviro
 /*------------*/
 /* Parse plan */
 /*------------*/
-
-void POPFEsterelPlanParser::createNodeAndEdge(const std::string& action_name, double dispatchTime, double duration,
-		int node_id, PlanningEnvironment &environment, StrlNode& node, StrlEdge& edge)
+rosplan_dispatch_msgs::ActionDispatch POPFEsterelPlanParser::createAction(const std::string& action_description, size_t id,
+		double dispatch_time, double duration, PlanningEnvironment& environment)
 {
-
-	node.node_name = action_name;
-	node.node_id = node_id;
-	node.dispatched = false;
-	node.completed = false;
-
-	// save this parent edge
-	edge.signal_type = ACTION;
-	std::stringstream ss;
-	ss << "e" << node.node_id;
-	edge.edge_name = ss.str();
-	edge.sources.push_back(&node);
-	edge.active = false;
-	plan_edges.push_back(&edge);
-
-	// prepare message
-	node.output.push_back(&edge);
-	node.dispatch_msg.action_id = node.node_id;
-	node.dispatch_msg.duration = duration;
-	node.dispatch_msg.dispatch_time = dispatchTime;
-	node.dispatch_msg.name = action_name;
-
-	// check for parameters
-	int curr = 0;
-	int next = 0;
-	bool paramsExist = (action_name.find(" ", curr) != std::string::npos);
-	if (paramsExist)
+	std::regex identifier_re("[^\\s]+", std::regex::icase); // anything not white space
+	std::sregex_iterator next(action_description.begin(), action_description.end(), identifier_re);
+	std::sregex_iterator end;
+	std::list<std::string> identifiers;
+	for(; next != end; next++)
 	{
-
-		// name
-		next = action_name.find(" ", curr);
-		node.dispatch_msg.name = action_name.substr(curr, next - curr).c_str();
-
-		// parameters
-		int parameter_index = 0;
-		std::vector<std::string> params;
-		while (next < action_name.length())
-		{
-
-			curr = next + 1;
-			next = action_name.find(" ", curr);
-			if (next == std::string::npos)
-				next = action_name.length();
-
-			diagnostic_msgs::KeyValue pair;
-			pair.key = environment.domain_operators[node.dispatch_msg.name][parameter_index];
-			pair.value = action_name.substr(curr, next - curr);
-			node.dispatch_msg.parameters.push_back(pair);
-			++parameter_index;
-		}
+		identifiers.push_back(next->str());
 	}
-	preparePDDLConditions(node, environment);
-	plan_nodes.push_back(&node);
-	action_list.push_back(node.dispatch_msg);
+	rosplan_dispatch_msgs::ActionDispatch msg;
+	msg.dispatch_time = dispatch_time;
+	msg.duration = duration;
+	msg.name = identifiers.front();
+	msg.action_id = id;
+	identifiers.pop_front();
+	for (const auto& param: identifiers)
+	{
+		diagnostic_msgs::KeyValue pair;
+		pair.key = environment.domain_operators[msg.name][msg.parameters.size()];
+		pair.value = param;
+		msg.parameters.push_back(pair);
+	}
+
+	return std::move(msg);
 }
 
+void POPFEsterelPlanParser::createNodeAndEdge(const rosplan_dispatch_msgs::ActionDispatch& action, PlanningEnvironment &environment)
+{
+	StrlNode* node = new StrlNode();
+	node->dispatch_msg = action;
+	node->node_id = action.action_id;
+	node->node_name = action.name;
+	plan_nodes.push_back(node);
+	StrlEdge* edge = new StrlEdge();
+	edge->signal_type = ACTION;
+	edge->edge_name = "e"+std::to_string(node->node_id);
+	edge->active = false;
+	plan_edges.push_back(edge);
+	node->output.push_back(edge);
+	edge->sources.push_back(node);
+	preparePDDLConditions(*node, environment);
+}
 
-void POPFEsterelPlanParser::earlifyActions(std::set<StrlNode*>& actions)
+//void POPFEsterelPlanParser::createNodeAndEdge(const std::string& action_name, double dispatchTime, double duration,
+//		int node_id, PlanningEnvironment &environment, StrlNode& node, StrlEdge& edge)
+//{
+//
+//	node.node_name = action_name;
+//	node.node_id = node_id;
+//	node.dispatched = false;
+//	node.completed = false;
+//
+//	// save this parent edge
+//	edge.signal_type = ACTION;
+//	std::stringstream ss;
+//	ss << "e" << node.node_id;
+//	edge.edge_name = ss.str();
+//	edge.sources.push_back(&node);
+//	edge.active = false;
+//	plan_edges.push_back(&edge);
+//
+//	// prepare message
+//	node.output.push_back(&edge);
+//	node.dispatch_msg.action_id = node.node_id;
+//	node.dispatch_msg.duration = duration;
+//	node.dispatch_msg.dispatch_time = dispatchTime;
+//	node.dispatch_msg.name = action_name;
+//
+//	// check for parameters
+//	int curr = 0;
+//	int next = 0;
+//	bool paramsExist = (action_name.find(" ", curr) != std::string::npos);
+//	if (paramsExist)
+//	{
+//
+//		// name
+//		next = action_name.find(" ", curr);
+//		node.dispatch_msg.name = action_name.substr(curr, next - curr).c_str();
+//
+//		// parameters
+//		int parameter_index = 0;
+//		std::vector<std::string> params;
+//		while (next < action_name.length())
+//		{
+//
+//			curr = next + 1;
+//			next = action_name.find(" ", curr);
+//			if (next == std::string::npos)
+//				next = action_name.length();
+//
+//			diagnostic_msgs::KeyValue pair;
+//			pair.key = environment.domain_operators[node.dispatch_msg.name][parameter_index];
+//			pair.value = action_name.substr(curr, next - curr);
+//			node.dispatch_msg.parameters.push_back(pair);
+//			++parameter_index;
+//		}
+//	}
+//	preparePDDLConditions(node, environment);
+//	plan_nodes.push_back(&node);
+//	action_list.push_back(node.dispatch_msg);
+//}
+//
+
+void POPFEsterelPlanParser::earlifyActions()
 {
 	double epsilon = 0.01;
 	std::map<StrlNode*, std::set<StrlNode*> > dependency_graph;
-	for (StrlNode* a: actions)
+	for (StrlNode* a: plan_nodes)
 	{
 		// for each parameter find earlier action with one same parameter
-//		ROS_INFO_STREAM("a: "<<a->dispatch_msg.name);
+		ROS_DEBUG_STREAM("a: "<<a->dispatch_msg.name);
 		for (const auto& p: a->dispatch_msg.parameters)
 		{
 			StrlNode* latest_depending = NULL;
 			double latest_end_time = 0;
-			for (const auto& other_a: actions)
+			for (const auto& other_a: plan_nodes)
 			{
 				if (a->dispatch_msg.action_id == other_a->dispatch_msg.action_id)
 				{
@@ -258,20 +317,40 @@ void POPFEsterelPlanParser::earlifyActions(std::set<StrlNode*>& actions)
 					double other_end_time = other_a->dispatch_msg.dispatch_time + other_a->dispatch_msg.duration;
 					if (other_end_time < a->dispatch_msg.dispatch_time + epsilon)
 					{
-//						ROS_INFO_STREAM("\to: "<<other_a->dispatch_msg.name<<" via "<<p.value);
+						ROS_DEBUG_STREAM("\to: "<<other_a->dispatch_msg.name<<" via "<<p.value);
 						dependency_graph[a].insert(other_a);
 					}
 				}
 			}
 		}
 	}
+
+	// remove transitive dependencies
+	for (auto& action_dependee: dependency_graph)
+	{
+		std::vector<StrlNode*> duplicates;
+		ROS_DEBUG_STREAM("a: "<<action_dependee.first->dispatch_msg.name);
+		for (const auto& prereq: action_dependee.second)
+		{
+			ROS_DEBUG_STREAM(" o: "<<prereq->dispatch_msg.action_id);
+			const auto& dep_deps = dependency_graph[prereq];
+			std::set_intersection(action_dependee.second.begin(), action_dependee.second.end(), dep_deps.begin(),
+					dep_deps.end(), std::inserter(duplicates, duplicates.end()));
+		}
+		for (auto& duplicate: duplicates)
+		{
+			ROS_DEBUG_STREAM("  d: "<<duplicate->dispatch_msg.action_id);
+			action_dependee.second.erase(duplicate);
+		}
+	}
+
 	for (auto& action_dependent: dependency_graph)
 	{
-//		ROS_INFO_STREAM("action: "<<action_dependent.first->dispatch_msg.name<<" depends on:");
+		ROS_DEBUG_STREAM("action: "<<action_dependent.first->dispatch_msg.name<<" depends on:");
 		for (auto& prereq: action_dependent.second)
 		{
-//			ROS_INFO_STREAM(" "<<prereq->dispatch_msg.name);
-			auto& edge = prereq->output.front();
+			ROS_DEBUG_STREAM(" "<<prereq->dispatch_msg.name);
+			auto& edge = prereq->output.front(); // every action has one output
 			action_dependent.first->input.push_back(edge);
 			edge->sinks.push_back(action_dependent.first);
 		}
@@ -285,6 +364,7 @@ void POPFEsterelPlanParser::earlifyActions(std::set<StrlNode*>& actions)
  */
 void POPFEsterelPlanParser::preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID)
 {
+	reset();
 
 	ROS_INFO("KCL: (POPFEsterelPlanParser) Loading plan from file: %s. Initial action ID: %zu",
 			((dataPath + "plan.pddl").c_str()), freeActionID);
@@ -303,69 +383,31 @@ void POPFEsterelPlanParser::preparePlan(std::string &dataPath, PlanningEnvironme
 		infile.close();
 	}
 
-	// prepare plan
-	StrlEdge* last_edge = NULL;
-	int curr, next, nodeCount;
-	plan_nodes.clear();
-	plan_edges.clear();
-	action_list.clear();
-	nodeCount = freeActionID;
-	std::set<StrlNode*> previous_actions;
+	// typical PDDL plan action
+	// 193.02530000: (transport-product r3 p70 bs_out bs rs2_in rs2 silver_base_p70 blue_ring_p70) [58.66200000]
+	std::regex action_re("([0-9]*\\.?[0-9]+).*: *\\((.+)\\) *\\[([0-9]*\\.?[0-9]+)\\]", std::regex::icase);
 	for (const auto& line : lines)
 	{
-		ROS_DEBUG_STREAM("[PlanParser] " << line);
-		if (line.find(";") == 0)
+		ROS_DEBUG_STREAM(line);
+		std::smatch parts;
+		if (! std::regex_search(line, parts, action_re))
 		{
-			ROS_DEBUG_STREAM("[PlanParser]  " << "skip line");
+			ROS_DEBUG_STREAM("no match");
 			continue;
 		}
-		if (line.length() < 2)
+		// [0]: whole action, [1]: dispatch_time, [2]: name + paramters, [3]: duration
+		if (parts.size() != 4)
 		{
-			break;
+			ROS_WARN_STREAM("KCL: (POPFEsterelPlanParser) malformed plan line: "<<line);
+			continue;
 		}
-		// dispatchTime
-		curr = line.find(":");
-		double dispatchTime = (double) atof(line.substr(0, curr).c_str());
-		curr += 3;
-
-		// action
-		next = line.find(")", curr);
-		std::string name = line.substr(curr, next - curr).c_str();
-
-		// duration
-		curr = line.find("[", curr) + 1;
-		next = line.find("]", curr);
-		double duration = (double) atof(line.substr(curr, next - curr).c_str());
-		{
-			StrlNode* node = new StrlNode();
-			StrlEdge* edge = new StrlEdge();
-			createNodeAndEdge(name, dispatchTime, duration, nodeCount, environment, *node, *edge);
-			++nodeCount;
-
-			// parallelization
-//			double epsilon = 0.01;
-//			for (const auto& a: previous_actions)
-//			{
-//				double a_finish_time = a->dispatch_msg.dispatch_time + a->dispatch_msg.duration;
-//				if (fabs(dispatchTime - a_finish_time) < epsilon)
-//				{
-//					auto& a_edge = a->output.front();
-//					node->input.push_back(a_edge);
-//					a_edge->sinks.push_back(node);
-//				}
-//			}
-			previous_actions.insert(node);
-//			if (last_edge != NULL)
-//			{
-//				node->input.push_back(last_edge);
-//				last_edge->sinks.push_back(node);
-//			}
-//			last_edge = edge;
-		}
-		ROS_DEBUG_STREAM("[PlanParser]  " << dispatchTime << ": " << name << " [" << duration << "]");
+		rosplan_dispatch_msgs::ActionDispatch action = createAction(parts[2], freeActionID++, std::stod(parts[1]), std::stod(parts[3]),
+				environment);
+		action_list.push_back(action);
+		createNodeAndEdge(action, environment);
 	}
 
-	earlifyActions(previous_actions);
+	earlifyActions();
 
 	produceEsterel();
 }

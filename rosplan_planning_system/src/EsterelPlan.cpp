@@ -3,6 +3,40 @@
 #include <vector>
 #include <string>
 #include <ostream>
+#include <algorithm>
+
+namespace KCL_rosplan
+{
+
+void StrlNode::activateInput(StrlEdge* signal)
+{
+	await_input[signal] = true;
+}
+
+bool StrlNode::allInputsActive() const
+{
+	if (input.empty())
+	{
+		return true;
+	}
+	return std::all_of(input.begin(), input.end(), [this](const auto signal)
+	{
+		auto sit = await_input.find(signal);
+		if (sit == await_input.end())
+		{
+			return false;
+		}
+		return sit->second;
+	});
+}
+
+void StrlNode::reset()
+{
+	await_input.clear();
+	dispatched = false;
+	completed = false;
+}
+}
 
 std::ostream& operator<<(std::ostream& os, const KCL_rosplan::StrlEdge& edge)
 {

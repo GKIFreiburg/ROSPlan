@@ -47,6 +47,11 @@ namespace KCL_rosplan {
 		 */
 		void createNodeAndEdge(const std::string& action_name, double dispatchTime, double duration, int node_id, PlanningEnvironment &environment, StrlNode& node, StrlEdge& edge);
 
+		rosplan_dispatch_msgs::ActionDispatch createAction(const std::string& action_description, size_t id, double dispatch_time,
+				double duration, PlanningEnvironment& environment);
+		void createNodeAndEdge(const rosplan_dispatch_msgs::ActionDispatch& action, PlanningEnvironment &environment);
+
+		void earlifyActions();
 	public:
 
 		/* plan description in Esterel */
@@ -55,6 +60,7 @@ namespace KCL_rosplan {
 
 		/* constructor */
 		POPFEsterelPlanParser(ros::NodeHandle &nh);
+		virtual ~POPFEsterelPlanParser();
 
 		/* service to parse plans */
 		bool produceEsterel();
@@ -64,7 +70,6 @@ namespace KCL_rosplan {
 		void preparePlan(std::string &dataPath, PlanningEnvironment &environment, size_t freeActionID);
 		void generateFilter(PlanningEnvironment &environment);
 
-		void earlifyActions(std::set<StrlNode*>& actions);
 	};
 } // close namespace
 

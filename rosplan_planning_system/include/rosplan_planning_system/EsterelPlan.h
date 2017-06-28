@@ -32,15 +32,25 @@ namespace KCL_rosplan
 		std::vector<StrlEdge*> input;
 		std::vector<StrlEdge*> output;
 
-		//std::vector<bool> await_input;
+		std::map<StrlEdge*, bool> await_input;
 		bool dispatched;
 		bool completed;
 
 		rosplan_dispatch_msgs::ActionDispatch dispatch_msg;
+		StrlNode()
+		{
+			node_id = -1;
+			dispatched = false;
+			completed = false;
+		}
+
+		void activateInput(StrlEdge* signal);
+		bool allInputsActive() const;
+		void reset();
 	};
 }
 
 std::ostream& operator<<(std::ostream& os, const KCL_rosplan::StrlEdge& edge);
-std::ostream& operator<<(std::ostream& os, const KCL_rosplan::StrlNode& edge);
+std::ostream& operator<<(std::ostream& os, const KCL_rosplan::StrlNode& node);
 
 #endif
